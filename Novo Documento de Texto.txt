@@ -1,0 +1,680 @@
+
+        public async Task<IEnumerable<ModuloDto>> GetModuloUsuario(int id)
+        {
+            var res = await _repositoryModulos.Repository.GetDataSet().Where(c => c.UsuarioId == id).Include(c => c.Modulo).Select(c => c.Modulo).ToListAsync();
+            var result = res.Select(c => new ModuloDto
+            {
+                Id = c.Id,
+                Descricao = c.Descricao,
+                Nome = c.Nome,
+                Image = Convert.ToBase64String(c.Image),
+                Rota = c.Rota
+            }).ToList();
+
+            return result;
+        }
+
+
+public byte[] Image { get; set; }
+
+
+public string BlobToStringConverter(OracleDbType.Blob blobObject){
+    if (blobObject != null){
+        return  Encoding.UTF8.GetString((byte[])(blobObject));
+    } else {
+        return string.Empty; 
+    }
+}
+
+        private readonly IUnitOfWork<Espaco> _unitOfWorky;
+
+
+
+//****************
+
+
+
+using AutoMapper;
+using CargaRecargaArmarioEstacionamento.Domain.Interfaces.Services;
+using Db.Domain.Entities.Cadastros.Base;
+using Db.Domain.Entities.Cadastros.Base.Configuracao;
+using Db.Domain.Entities.Cadastros.DayUse;
+using Db.Domain.Entities.Cadastros.DayUse.Cartao;
+using Db.Domain.Entities.DayUse.AutoAtendimento;
+using Db.Domain.Entities.DayUse.VendaBar;
+using Db.Domain.Enum.DayUse;
+using Domain.Entities.Cadastros.Empresa;
+using Domain.Entities.Cadastros.Produto;
+using Domain.Enum;
+using Domain.Interfaces;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using ServicosPrimitivos.Domain.Dtos;
+using ServicosPrimitivos.Domain.Interfaces.Services;
+using ServicosPrimitivos.Domain.Interfaces.Services.Configuracao;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace CargaRecargaArmarioEstacionamento.Services
+{
+    public class ArmarioServices : IArmarioServices
+    {
+        private readonly IUnitOfWork<Armario> _unitOfWorky;
+        private readonly IUnitOfWorkGenerico<CartaoConsumo> _unitOfWorkyCartao;
+        private readonly IUnitOfWork<produto> _unitOfWorkyProduto;
+        private readonly IUnitOfWorkGenerico<MovimentacaoCartaoConsumo> _unitOfWorkyMovimentacaoCartaoConsumo;
+        private readonly IUnitOfWorkGenerico<MovimentacaoCartaoProdutos> _unitOfWorkyMovimentacaoCartaoProduto;
+        private readonly IUnitOfWork<AutomacaoMovimento> _unitOfWorkyMovimentacaoArmario;
+        private readonly IUnitOfWork<Empresas> _unitOfWorkyEmpresa;
+        private readonly ICartaoConsumoServices _serviceCartaoConsumo;
+        private readonly IConfiguracaoServices _serviceConfiguracao;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly IUnitOfWorkGenerico<ConfiguracaoDayUse> _unitOfWorkConfiguracao;
+
+
+        private readonly IMapper _mapper;
+        public ArmarioServices(IUnitOfWork<Armario> unitOfWorky, IMapper mapper, IUnitOfWorkGenerico<CartaoConsumo> unitOfWorkyCartao,
+            ICartaoConsumoServices serviceCartaoConsumo, IUnitOfWorkGenerico<MovimentacaoCartaoConsumo> unitOfWorkyMovimentacaoCartaoConsumo,
+            IUnitOfWork<AutomacaoMovimento> unitOfWorkyMovimentacaoArmario, UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IUnitOfWorkGenerico<ConfiguracaoDayUse> unitOfWorkConfiguracao, IUnitOfWorkGenerico<MovimentacaoCartaoProdutos> unitOfWorkyMovimentacaoCartaoProduto, IUnitOfWork<produto> unitOfWorkyProduto, IUnitOfWork<Empresas> unitOfWorkyEmpresa, IConfiguracaoServices serviceConfiguracao)
+        {
+            _unitOfWorky = unitOfWorky;
+            _unitOfWorkyCartao = unitOfWorkyCartao;
+            _unitOfWorkyMovimentacaoCartaoConsumo = unitOfWorkyMovimentacaoCartaoConsumo;
+            _unitOfWorkyMovimentacaoArmario = unitOfWorkyMovimentacaoArmario;
+            _serviceCartaoConsumo = serviceCartaoConsumo;
+            _mapper = mapper;
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _unitOfWorkConfiguracao = unitOfWorkConfiguracao;
+            _unitOfWorkyMovimentacaoCartaoProduto = unitOfWorkyMovimentacaoCartaoProduto;
+            _unitOfWorkyProduto = unitOfWorkyProduto;
+            _unitOfWorkyEmpresa = unitOfWorkyEmpresa;
+            _serviceConfiguracao = serviceConfiguracao;
+        }
+
+
+        private string postUrl = "";
+
+        public async Task<ArmarioRetorno> LiberarUnicoArmarioManutencao(ArmarioManutecaoDto armario)
+        {
+            var armarioEntidade = await _unitOfWorky.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroArmario && c.BlocoId == armario.BlocoId);
+            var entidade = _mapper.Map<Armario>(armarioEntidade);
+            entidade.SituacaoArmario = SituacaoArmario.Livre;
+            entidade.Observacao = "";
+            await _unitOfWorky.Repository.UpdateAsync(entidade);
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Armario liberado da manutenção com sucesso" };
+        }
+
+
+        public async Task<IEnumerable<ArmarioGetDto>> GetAll()
+        {
+            var armario = await _unitOfWorky.Repository.GetDataSet().Include(c => c.Bloco).ToListAsync();
+            return _mapper.Map<IEnumerable<ArmarioGetDto>>(armario);
+
+        }
+
+        public async Task<IEnumerable<ArmarioGetDto>> BuscarListaArmarioBloco(int blocoId)
+        {
+            var armario = await _unitOfWorky.Repository.GetDataSet().Where(c => c.BlocoId == blocoId).Include(c => c.Bloco).ToListAsync();
+            return _mapper.Map<IEnumerable<ArmarioGetDto>>(armario);
+        }
+
+        public async Task<ArmarioRetorno> LiberarTodosArmarioManutencao()
+        {
+            var armarioEntidade = await _unitOfWorky.Repository.GetDataSet().Where(c => c.SituacaoArmario == SituacaoArmario.Manutencao).ToListAsync();
+
+            foreach (var item in armarioEntidade)
+            {
+                var entidade = _mapper.Map<Armario>(item);
+                entidade.SituacaoArmario = SituacaoArmario.Livre;
+                entidade.Observacao = "";
+                await _unitOfWorky.Repository.UpdateAsync(entidade);
+            }
+
+
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Todos armario liberado da manutenção com sucesso" };
+        }
+
+        public async Task<ArmarioRetorno> LiberarTodosArmarioOcupado()
+        {
+            var armarioEntidade = await _unitOfWorky.Repository.GetDataSet().Where(c => c.SituacaoArmario == SituacaoArmario.Ocupado).ToListAsync();
+
+            foreach (var item in armarioEntidade)
+            {
+                var entidade = _mapper.Map<Armario>(item);
+                entidade.SituacaoArmario = SituacaoArmario.Livre;
+                entidade.CartaoConsumoId = null;
+                await _unitOfWorky.Repository.UpdateAsync(entidade);
+            }
+
+
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Todos armario liberado com sucesso" };
+        }
+
+        public async Task<ArmarioRetorno> ColocarArmarioManutencao(ArmarioManutecaoDto armario)
+        {
+            var armarioEntidade = await _unitOfWorky.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroArmario && c.BlocoId == armario.BlocoId);
+            var entidade = _mapper.Map<Armario>(armarioEntidade);
+            entidade.SituacaoArmario = SituacaoArmario.Manutencao;
+            entidade.Observacao = armario.Observacao;
+            await _unitOfWorky.Repository.UpdateAsync(entidade);
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Armario colocado em manutenção com sucesso" };
+        }
+        public async Task<bool> Delete(int id)
+        {
+            return await _unitOfWorky.Repository.DeleteAsync(id);
+        }
+        public async Task<ArmarioGetDto> Get(int id)
+        {
+            var grupo = await _unitOfWorky.Repository.SelectAsync(id);
+            return _mapper.Map<ArmarioGetDto>(grupo);
+        }
+
+        public async Task<ArmarioDto> Post(ArmarioDto armario)
+        {
+            var entidade = _mapper.Map<Armario>(armario);
+            entidade.Ativo = true;
+            var result = await _unitOfWorky.Repository.InsertAsync(entidade);
+
+            return _mapper.Map<ArmarioDto>(result);
+        }
+        public async Task<ArmarioDto> Put(ArmarioDto armario)
+        {
+            var entidade = _mapper.Map<Armario>(armario);
+            entidade.Ativo = true;
+            var result = await _unitOfWorky.Repository.UpdateAsync(entidade);
+
+            return _mapper.Map<ArmarioDto>(result);
+        }
+        public async Task<ArmarioRetorno> AlugarArmario(ArmarioAlugarDto armario)
+        {
+            var armarioEntidade = await _unitOfWorky.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroArmario && c.BlocoId == armario.BlocoId);
+
+            if (armarioEntidade != null && armarioEntidade.SituacaoArmario == SituacaoArmario.Livre)
+            {
+                var cartao = await _unitOfWorkyCartao.Repository.GetDataSet().Where(c => c.Numero == armario.NumeroCartaoConsumo).FirstOrDefaultAsync();
+                if (cartao != null)
+                {
+                    if (cartao.Armarios != null)
+                        return new ArmarioRetorno { Mensagens = "Cartão Consumo já existe um armario cadastrado", Sucesso = false };
+
+                    var saldo = await _serviceCartaoConsumo.ConsultaSaldo(cartao.Numero);
+                    var valorArmario = Convert.ToDecimal(await _serviceConfiguracao.GetValorArmario());
+                    var valorCaucaoArmario = Convert.ToDecimal(await _serviceConfiguracao.GetValorCaucaoArmario());
+
+                    if (saldo.SaldoComDescontoCaucao >= valorArmario && !armarioEntidade.Chave ||
+                        saldo.SaldoComDescontoCaucao >= valorArmario + valorCaucaoArmario && armarioEntidade.Chave)
+                    {
+                        var valorTotal = decimal.Zero;
+                        if (!armarioEntidade.Chave)
+                            valorTotal = valorArmario;
+                        else
+                            valorTotal = valorArmario + valorCaucaoArmario;
+                        
+                        armarioEntidade.CartaoConsumoId = cartao.Id;
+                        armarioEntidade.NumeroCartao = cartao.Numero;
+
+                        armarioEntidade.SituacaoArmario = SituacaoArmario.Ocupado;
+                        await _unitOfWorky.Repository.UpdateAsync(armarioEntidade);
+
+                        //Adiciona na Movimentacao Armario
+                        await _unitOfWorkyMovimentacaoArmario.Repository
+                           .InsertAsync(new AutomacaoMovimento
+                           {
+                               ArmarioId = armarioEntidade.Id,
+                               DataAluguel = DateTime.Now,
+                               NumeroComprovante = (int)cartao.NumeroComprovante
+                           });
+                        var empresaArmario = (await _unitOfWorkyEmpresa.Repository.GetDataSet().Where(c => c.Fantasia == "ARMARIOS").FirstOrDefaultAsync()).Id;
+
+                        if (cartao.TipoCartaoConsumo != TipoCartaoConsumo.Hotel)
+                        {
+                            var item = await _unitOfWorkyProduto.Repository.GetDataSet().Where(c => c.Descricao == "ARMARIO").FirstOrDefaultAsync();
+                            //Movimentacao Cartao Insert
+                            var mov = await _unitOfWorkyMovimentacaoCartaoConsumo.Repository.InsertAsync(new MovimentacaoCartaoConsumo
+                            {
+                                CartaoConsumoId = cartao.Id,
+                                Data = DateTime.Now,
+                                NumeroComprovante = cartao.NumeroComprovante,
+                                TipoMovimentoCartao = TipoMovimentoCartao.Armario,
+                                Valor = valorTotal,
+                                EmpresaId = empresaArmario,
+                            });
+
+
+                            //Movimentacao Cartao Insert
+                            await _unitOfWorkyMovimentacaoCartaoProduto.Repository.InsertAsync(new MovimentacaoCartaoProdutos
+                            {
+
+                                Cancelado = false,
+                                ItemId = item.Id,
+                                Quantidade = 1,
+                                Total = valorTotal,
+                                MovimentacaoCartaoId = mov.Id,
+                                VendaMobile = false,
+                                VendaBarId = null,
+
+                            });
+                        }
+                        else
+                        {
+                            var item = await _unitOfWorkyProduto.Repository.GetDataSet().Where(c => c.Descricao == "ARMARIO").FirstOrDefaultAsync();
+                            //var empre = (await _unitOfWorkyEmpresa.Repository.GetDataSet().Where(c => c.TipoEmpresa == TipoEmpresa.Administracao).FirstOrDefaultAsync()).Id;
+
+
+                            var movi = await _unitOfWorkyMovimentacaoCartaoConsumo.Repository.InsertAsync(new MovimentacaoCartaoConsumo
+                            {
+                                CartaoConsumoId = cartao.Id,
+                                Data = DateTime.Now,
+                                NumeroComprovante = cartao.NumeroComprovante,
+                                TipoMovimentoCartao = TipoMovimentoCartao.Armario,
+                                Valor = item.ValorUnitario,
+                                EmpresaId = empresaArmario
+                            });
+
+                            //Movimentacao Cartao Insert
+                            await _unitOfWorkyMovimentacaoCartaoProduto.Repository.InsertAsync(new MovimentacaoCartaoProdutos
+                            {
+
+                                Cancelado = false,
+                                ItemId = item.Id,
+                                Quantidade = 1,
+                                Total = item.ValorUnitario,
+                                MovimentacaoCartaoId = movi.Id,
+                                VendaMobile = false,
+                                VendaBarId = null,
+                                
+                            });
+                        }
+                    }
+                    else
+                        return new ArmarioRetorno { Sucesso = false, Mensagens = "Saldo Insulficiente" };
+                }
+                else
+                    return new ArmarioRetorno { Sucesso = false, Mensagens = "Cartão Não Existe" };
+            }
+            else
+                return new ArmarioRetorno { Sucesso = false, Mensagens = "Armario não Existe ou Está ocupado" };
+
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Armario Alugado com sucesso" };
+        }
+        public async Task<ArmarioRetorno> TrocarArmario(ArmarioTrocarDto armario)
+        {
+            var armarioTroca = await _unitOfWorky.Repository.GetDataSet()
+                .Where(c => c.Numero == armario.NumeroArmarioTroca && c.BlocoId == armario.BlocoArmarioTrocaId)
+                .Include(c => c.CartaoConsumo)
+                .Include(c => c.Bloco)
+                .FirstOrDefaultAsync();
+            var armarioNovo = await _unitOfWorky.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroArmarioNovo && c.BlocoId == armario.BlocoArmarioNovoId);
+            if (armarioTroca != null && armarioNovo != null)
+            {
+
+                if (armarioTroca.CartaoConsumoId != null)
+                {
+                    armarioNovo.SituacaoArmario = SituacaoArmario.Ocupado;
+                    armarioNovo.CartaoConsumoId = armarioTroca.CartaoConsumoId;
+                    armarioNovo.NumeroCartao = armarioTroca.NumeroCartao;
+                    armarioTroca.CartaoConsumoId = null;
+                    armarioTroca.NumeroCartao = null;
+                    armarioTroca.SituacaoArmario = SituacaoArmario.Livre;
+
+
+
+                    await _unitOfWorky.Repository.UpdateAsync(armarioNovo);
+                    await _unitOfWorky.Repository.UpdateAsync(armarioTroca);
+
+                    var ArmarioAutomatizado = (await _unitOfWorkConfiguracao.Repository.SelectWhereDefaultAsync(x => x.Nome.Equals("ARMARIO_AUTOMATIZADO"))).Valor;
+
+                    if (ArmarioAutomatizado == "SIM")
+                    {
+
+                        //await EnviarComandoPutArmarioCatraca(armarioTroca.Bloco.IP, "reset", "wifi");
+
+
+                        await EnviarComandoPutArmarioCatraca(armarioTroca.Bloco.IP, "r" + armario.NumeroArmarioTroca, "wifi");
+                        Thread.Sleep(2000);
+                        await EnviarComandoPutArmarioCatraca(armarioTroca.Bloco.IP, "r" + armario.NumeroArmarioTroca, "wifi");
+
+                        //var retorno = EnviarComandoGet(armarioTroca.Bloco.IP);
+                        //if (retorno)
+                        //   EnviarComandoPut(armarioTroca.Bloco.IP, "r" + armarioTroca.Numero);
+
+
+                        //var httpReq = String.Format("{0}{1}&IdArmarioTroca={2}&NumeroArmarioTroca={3}",
+                        //"http://localhost:8060/apiArmarios/Armarios/TrocarArmarioLista?IdBlocoTroca=",
+                        // armarioNovo.BlocoId,
+                        // armarioNovo.Id,
+                        // armarioNovo.Numero);
+
+
+                        //HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(httpReq);
+                        //request.Method = "GET";
+                        //request.GetResponseAsync();
+                    }
+
+                }
+                else
+                    return new ArmarioRetorno { Sucesso = false, Mensagens = "Esse armario não esta alugado" };
+            }
+            else
+                return new ArmarioRetorno { Sucesso = false, Mensagens = "Armario não Existe" };
+
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Armario Trocado com sucesso" };
+        }
+        public async Task<ArmarioRetorno> DevolucaoArmario(ArmarioAlugarDto armario)
+        {
+            var armarioDevolucao = await _unitOfWorky.Repository.GetDataSet().Where(c => c.Numero == armario.NumeroArmario && c.BlocoId == armario.BlocoId).Include(c => c.Bloco).FirstOrDefaultAsync();
+            if (armarioDevolucao != null)
+            {
+                var cartao = await _unitOfWorkyCartao.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroCartaoConsumo);
+                if (cartao != null)
+                {
+                    if (!armarioDevolucao.Chave)
+                    {
+                        armarioDevolucao.SituacaoArmario = SituacaoArmario.Livre;
+                        armarioDevolucao.CartaoConsumoId = null;
+                        await _unitOfWorky.Repository.UpdateAsync(armarioDevolucao);
+
+                        var ArmarioAutomatizado = (await _unitOfWorkConfiguracao.Repository.SelectWhereDefaultAsync(x => x.Nome.Equals("ARMARIO_AUTOMATIZADO"))).Valor;
+
+                        if (ArmarioAutomatizado == "SIM")
+                        {
+
+                            var retorno = EnviarComandoGet(armarioDevolucao.Bloco.IP);
+                            if (retorno)
+                                EnviarComandoPut(armarioDevolucao.Bloco.IP, "r" + armarioDevolucao.Numero);
+
+
+                            var httpReq = String.Format("{0}{1}", "http://localhost:8060/apiArmarios/Armarios/RemoverArmarioLista?IdDoCartao=", cartao.Id);
+
+                            HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(httpReq);
+                            request.Method = "GET";
+                            request.GetResponseAsync();
+                        }
+
+                    }
+                    else
+                    {
+
+
+
+                        armarioDevolucao.SituacaoArmario = SituacaoArmario.Livre;
+                        await _unitOfWorky.Repository.UpdateAsync(armarioDevolucao);
+
+                        var valorDevolucaoArmario = Convert.ToDecimal(await _serviceConfiguracao.GetValorCaucaoArmario());
+
+
+                        var idmovimentoCartao = (await _unitOfWorkyMovimentacaoCartaoConsumo.Repository.GetDataSet()
+                            .Where(c => c.NumeroComprovante == cartao.NumeroComprovante && c.CartaoConsumoId == cartao.Id && c.TipoMovimentoCartao == TipoMovimentoCartao.Armario).FirstOrDefaultAsync()).Id;
+
+                        //var armario = _unitOfWorkyMovimentacaoArmario.Repository.GetDataSet().Where(c => c.NumeroComprovante == )
+                        //Movimentacao Cartao Insert
+                        await _unitOfWorkyMovimentacaoCartaoConsumo.Repository.InsertAsync(new MovimentacaoCartaoConsumo
+                        {
+                            CartaoConsumoId = cartao.Id,
+                            Data = DateTime.Now,
+                            NumeroComprovante = cartao.NumeroComprovante,
+                            TipoMovimentoCartao = TipoMovimentoCartao.DevolucaoArmario,
+                            Valor = valorDevolucaoArmario,
+                        });
+
+                        var movimentoProdutoCartao = await _unitOfWorkyMovimentacaoCartaoProduto.Repository.GetDataSet().Where(c => c.MovimentacaoCartaoId == idmovimentoCartao).FirstOrDefaultAsync();
+
+                        movimentoProdutoCartao.Total = movimentoProdutoCartao.Total - valorDevolucaoArmario;
+
+                        await _unitOfWorkyMovimentacaoCartaoProduto.Repository.UpdateAsync(movimentoProdutoCartao);
+                    }
+                }
+                else
+                    return new ArmarioRetorno { Sucesso = false, Mensagens = "Cartão Não Existe" };
+            }
+            else
+                return new ArmarioRetorno { Sucesso = false, Mensagens = "Armario não Existe" };
+
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Armario Devolvido com sucesso" };
+        }
+
+        public static void EnviarComandoPut(string IP, string parametro)
+        {
+            try
+            {
+                var postUrl = String.Format("http://{0}/?={1}", IP, parametro);
+                HttpWebRequest Request = (HttpWebRequest)HttpWebRequest.Create(postUrl);
+                Request.Method = "PUT";
+                //Request.AllowAutoRedirect = false;
+
+                //Request.KeepAlive = false;
+                //Request.ContentLength = 0;
+                //Request.Timeout = 20 * (1000 * 60); // minutos
+                //Request.ReadWriteTimeout = 20 * (1000 * 60); // minutos
+                //Request.Proxy = null;
+
+                Request.Timeout = 3000; // minutos
+                Request.ReadWriteTimeout = 3000; // minutos
+
+                HttpWebResponse Response = (HttpWebResponse)Request.GetResponse();
+                Stream ResponseStream = Response.GetResponseStream();
+                StreamReader ResponseReader = new StreamReader(ResponseStream);
+
+                Response.Close();
+                ResponseStream.Close();
+                ResponseReader.Close();
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message, e);
+            }
+        }
+
+
+        public async Task<bool> EnviarComandoPutArmarioCatraca(string IP, string parametro, string conexao)
+        {
+            try
+            {
+             
+                    postUrl = String.Format("http://{0}/?a=:{1}", IP, parametro);
+
+                HttpWebRequest Request = (HttpWebRequest)HttpWebRequest.Create(postUrl);
+                Request.Method = "PUT";
+                //Request.AllowAutoRedirect = false;
+
+                //Request.KeepAlive = false;
+                //Request.ContentLength = 0;
+                Request.Timeout = 20 * (3000 * 60); // minutos
+                Request.ReadWriteTimeout = 20 * (3000 * 60); // minutos
+                //Request.Proxy = null;
+
+                //Request.Timeout = 3000; // minutos
+                //Request.ReadWriteTimeout = 3000; // minutos
+
+                HttpWebResponse Response = (HttpWebResponse)Request.GetResponse();
+                Stream ResponseStream = Response.GetResponseStream();
+                StreamReader ResponseReader = new StreamReader(ResponseStream);
+
+                Response.Close();
+                ResponseStream.Close();
+                ResponseReader.Close();
+                return true;
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message, e);
+            }
+        }
+
+
+        public static bool EnviarComandoGet(string IP)
+        {
+            try
+            {
+                try
+                {
+                    HttpWebRequest Request = (HttpWebRequest)HttpWebRequest.Create("http://" + IP + "/");
+                    Request.Method = "GET";
+
+                    //Request.Timeout = 20 * (1000 * 60); // minutos
+                    //Request.ReadWriteTimeout = 20 * (1000 * 60); // minutos
+
+                    Request.Timeout = 3000; // minutos
+                    Request.ReadWriteTimeout = 3000; // minutos
+
+                    HttpWebResponse Response = (HttpWebResponse)Request.GetResponse();
+                    Stream ResponseStream = Response.GetResponseStream();
+                    StreamReader ResponseReader = new StreamReader(ResponseStream);
+
+                    Response.Close();
+                    ResponseStream.Close();
+                    ResponseReader.Close();
+                    return true;
+                }
+                catch (Exception)
+                {
+
+                    return false;
+                }
+
+
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
+        }
+
+
+        public async Task<ArmarioRetorno> EstornoArmario(ArmarioEstornoDto armario)
+        {
+            var armarioEstorno = await _unitOfWorky.Repository.GetDataSet().Where(c => c.Numero == armario.NumeroArmario && c.BlocoId == armario.BlocoId).Include(c => c.Bloco).FirstOrDefaultAsync();
+            var idCartao = 0;
+
+            if (armarioEstorno != null && armarioEstorno?.CartaoConsumoId != null)
+            {
+                var cartao = await _unitOfWorkyCartao.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroCartaoConsumo);
+                if (cartao != null)
+                {
+                    idCartao = cartao.Id;
+                    var movArmario = await _unitOfWorkyMovimentacaoArmario.Repository
+                            .SelectWhereDefaultAsync(c => c.DataAluguel != null && c.NumeroComprovante == cartao.NumeroComprovante && c.DataEstorno == null);
+
+                    TimeSpan ts = DateTime.Now - (DateTime)movArmario.DataAluguel;
+
+                    if (!armario.permissao && ts.TotalHours >= 1)
+                    {
+                        var retorno = await EstornoComLimiteExcedido(armario);
+
+                        if (retorno.Sucesso)
+                            return new ArmarioRetorno { Sucesso = false, Mensagens = "Armario Estornado com sucesso" };
+                        else
+                            return new ArmarioRetorno { Sucesso = false, Mensagens = "Tempo Excedido, Digite a senha para autorização" };
+                    }
+                    else
+                    {
+                        return await EstornarArmario(armario);
+                    }
+                }
+                else
+                    return new ArmarioRetorno { Sucesso = false, Mensagens = "Cartão Não Existe" };
+            }
+            else
+            {
+                return new ArmarioRetorno { Sucesso = false, Mensagens = "Armario não existe" };
+            }
+        }
+
+
+        public async Task<ArmarioRetorno> EstornarArmario(ArmarioEstornoDto armario)
+        {
+
+            var armarioEstorno = await _unitOfWorky.Repository.GetDataSet().Where(c => c.Numero == armario.NumeroArmario && c.BlocoId == armario.BlocoId).Include(c => c.Bloco).FirstOrDefaultAsync();
+
+            armarioEstorno.SituacaoArmario = SituacaoArmario.Livre;
+            armarioEstorno.CartaoConsumoId = null;
+            await _unitOfWorky.Repository.UpdateAsync(armarioEstorno);
+
+            var cartao = await _unitOfWorkyCartao.Repository.SelectWhereDefaultAsync(c => c.Numero == armario.NumeroCartaoConsumo);
+
+            var movArmario = await _unitOfWorkyMovimentacaoArmario.Repository
+            .SelectWhereDefaultAsync(c => c.DataAluguel != null && c.NumeroComprovante == cartao.NumeroComprovante && c.DataEstorno == null);
+
+
+            //Adicionar na movimentacao do armario os estorno                 
+            movArmario.DataEstorno = DateTime.Now;
+            movArmario.UsuarioEstornoId = armario.UsuarioId;
+            await _unitOfWorkyMovimentacaoArmario.Repository.UpdateAsync(movArmario);
+
+            var valorArmario = Convert.ToDecimal(await _serviceConfiguracao.GetValorArmario());
+
+            if (armarioEstorno.Chave)
+                valorArmario += Convert.ToDecimal(await _serviceConfiguracao.GetValorCaucaoArmario());
+
+            var ArmarioAutomatizado = (await _unitOfWorkConfiguracao.Repository.SelectWhereDefaultAsync(x => x.Nome.Equals("ARMARIO_AUTOMATIZADO"))).Valor;
+
+
+            //Movimentacao Cartao Insert
+            await _unitOfWorkyMovimentacaoCartaoConsumo.Repository.InsertAsync(new MovimentacaoCartaoConsumo
+            {
+                CartaoConsumoId = cartao.Id,
+                Data = DateTime.Now,
+                NumeroComprovante = cartao.NumeroComprovante,
+                TipoMovimentoCartao = TipoMovimentoCartao.EstornoArmario,
+                Valor = valorArmario
+            });
+
+            if (ArmarioAutomatizado == "SIM")
+            {
+
+                var retorno = EnviarComandoGet(armarioEstorno.Bloco.IP);
+                if (retorno)
+                    EnviarComandoPut(armarioEstorno.Bloco.IP, "r" + armarioEstorno.Numero);
+
+
+                var httpReq = String.Format("{0}{1}", "http://localhost:8060/apiArmarios/Armarios/RemoverArmarioLista?IdDoCartao=", cartao.Id);
+
+                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(httpReq);
+                request.Method = "GET";
+                request.GetResponseAsync();
+            }
+
+
+            return new ArmarioRetorno { Sucesso = true, Mensagens = "Armario Estornado com sucesso" };
+        }
+
+
+
+
+        public async Task<ArmarioRetorno> EstornoComLimiteExcedido(ArmarioEstornoDto estorno)
+        {
+            var user1 = new ApplicationUser();
+
+            user1 = await _userManager.FindByIdAsync(Convert.ToString(estorno.UsuarioId));
+
+            //var user = await _userManager.FindByNameAsync(user1.UserName);
+
+
+            if (user1.Ativo)
+            {
+                var claimsIdentity = await _userManager.GetClaimsAsync(user1);
+
+
+                var claim = claimsIdentity.Where(c => c.Type == "Armario").FirstOrDefault(); 
+                
+                if (claim == null)
+                    return new ArmarioRetorno { Mensagens = "Permissão negada, por favor tente novamente", Sucesso = false, };
+
+                if (claim.Value.Contains("EstornoArmarioLimiteExcedido"))                        
+                    return await EstornarArmario(estorno);
+                else
+                    return new ArmarioRetorno { Mensagens = "Permissão negada, por favor tente novamente", Sucesso = false, };
+            }
+            else
+                return new ArmarioRetorno { Mensagens = "Usuario não encontrado", Sucesso = false };
+        }
+    }
+}
+
