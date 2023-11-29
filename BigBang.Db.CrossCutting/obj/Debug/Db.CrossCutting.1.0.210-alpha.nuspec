@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Db.CrossCutting</id>
+    <version>1.0.210-alpha</version>
+    <authors>Db.CrossCutting</authors>
+    <description>Package Description</description>
+    <dependencies>
+      <group targetFramework="net6.0">
+        <dependency id="Db.Data" version="1.0.263-alpha" exclude="Build,Analyzers" />
+        <dependency id="Db.Domain" version="1.0.263-alpha" exclude="Build,Analyzers" />
+        <dependency id="AutoMapper" version="9.0.0" exclude="Build,Analyzers" />
+        <dependency id="AutoMapper.Extensions.Microsoft.DependencyInjection" version="7.0.0" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="D:\git\BigBang.Db.Core\BigBang.Db.CrossCutting\bin\Debug\net6.0\Db.CrossCutting.runtimeconfig.json" target="lib\net6.0\Db.CrossCutting.runtimeconfig.json" />
+    <file src="D:\git\BigBang.Db.Core\BigBang.Db.CrossCutting\bin\Debug\net6.0\Db.CrossCutting.dll" target="lib\net6.0\Db.CrossCutting.dll" />
+  </files>
+</package>

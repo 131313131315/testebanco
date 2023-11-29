@@ -1,0 +1,14 @@
+D:\gitmr\Db-Core\BigBang.Db.Domain\bin\Debug\net7.0\Db.Domain.deps.json
+D:\gitmr\Db-Core\BigBang.Db.Domain\bin\Debug\net7.0\Db.Domain.runtimeconfig.json
+D:\gitmr\Db-Core\BigBang.Db.Domain\bin\Debug\net7.0\Db.Domain.dll
+D:\gitmr\Db-Core\BigBang.Db.Domain\bin\Debug\net7.0\Db.Domain.pdb
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.csproj.AssemblyReference.cache
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.AssemblyInfoInputs.cache
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.AssemblyInfo.cs
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.csproj.CoreCompileInputs.cache
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.dll
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\refint\Db.Domain.dll
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.pdb
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\Db.Domain.genruntimeconfig.cache
+D:\gitmr\Db-Core\BigBang.Db.Domain\obj\Debug\net7.0\ref\Db.Domain.dll

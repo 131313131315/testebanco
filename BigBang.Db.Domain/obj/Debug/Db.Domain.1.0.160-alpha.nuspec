@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>Db.Domain</id>
+    <version>1.0.160-alpha</version>
+    <authors>BaseDomain</authors>
+    <description>Package Description</description>
+    <dependencies>
+      <group targetFramework="net6.0">
+        <dependency id="Microsoft.AspNetCore.Http.Abstractions" version="2.2.0" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.AspNetCore.Identity.EntityFrameworkCore" version="6.0.8" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.AspNetCore.Mvc.Core" version="2.2.5" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.EntityFrameworkCore" version="6.0.8" exclude="Build,Analyzers" />
+        <dependency id="Microsoft.Extensions.Identity.Core" version="6.0.8" exclude="Build,Analyzers" />
+        <dependency id="System.IdentityModel.Tokens.Jwt" version="5.5.0" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="D:\git\BigBang.Db.Core\BigBang.Db.Domain\bin\Debug\net6.0\Db.Domain.runtimeconfig.json" target="lib\net6.0\Db.Domain.runtimeconfig.json" />
+    <file src="D:\git\BigBang.Db.Core\BigBang.Db.Domain\bin\Debug\net6.0\Db.Domain.dll" target="lib\net6.0\Db.Domain.dll" />
+  </files>
+</package>
